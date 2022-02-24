@@ -32,7 +32,7 @@ conda activate SurRF
 
 运行`python generate_samples.py `可以获取包括相邻关系的所有atlas边界的边界采样点集合
 
-可设置的参数：`xxx.obj,resol,atlas_selected,sample_width`
+可设置的参数：`xxx.obj,mesh_resol,atlas_resol,atlas_selected,sample_width`
 
 #### 可视化效果：
 
@@ -43,4 +43,3 @@ conda activate SurRF
 ##### 2.可视化程序：
 
 运行`python sample_visualize.py`可视化结果，结果保存在`visualize`文件夹中，可以据此验证`generate_samples.py`程序运行是否正确
-
