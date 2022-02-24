@@ -157,6 +157,7 @@ def generate_samples(file_path,mesh_resol=3,num_atlas=40,sample_width = 2,atlas_
     edges_samples = []
     for i in range(len(atlas_mesh_list)):
         if i not in valid_id:
+            edges_samples.append([[-1]]*len(atlas_mesh_list))
             continue
         each_samples = []
         atlas_mesh = atlas_mesh_list[i]
@@ -183,4 +184,6 @@ def generate_samples(file_path,mesh_resol=3,num_atlas=40,sample_width = 2,atlas_
 if __name__ == '__main__':
     edges_samples,valid_id = generate_samples(file_path = '/hdd1/zhangkai/256X40',mesh_resol=3,num_atlas=40,sample_width = 2,atlas_resol = 128)
     print(valid_id)
+    # print(edges_samples[38])
+    print(edges_samples[38][0])
     
