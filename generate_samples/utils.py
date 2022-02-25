@@ -1,6 +1,7 @@
 import os
 import torch
 import numpy as np
+from plyfile import PlyData, PlyElement
 from pytorch3d.io import load_obj, save_obj
 from pytorch3d.structures import Meshes, Pointclouds, join_meshes_as_scene, join_meshes_as_batch
 from pytorch3d.renderer.mesh.rasterizer import Fragments
@@ -192,3 +193,244 @@ def mesh_from_list(verts_atlas, faces_atlas, verts_uvs_atlas, faces_uvs_atlas,
         atlas_mesh_list.append(mesh)
 
     return atlas_mesh_list
+
+'''
+用于3D可视化,原来uv_warping.py中的函数,为了不需要在原文件夹下运行,因此单独拿出来了
+'''
+
+def initialize_atlas_uv_map(resol=128, mesh=None):
+    """
+        Args:
+            mesh: pytorch3d Meshes object.
+    """
+    faces_uvs = mesh.textures.faces_uvs_padded()[0] # (num_view, num_faces, 3) --> (num_faces, 3)
+    verts_uvs = mesh.textures.verts_uvs_padded()[0] # (num_view, num_verts, 2) --> (num_verts, 2)
+
+    face_verts_uvs = verts_uvs[faces_uvs]   # (num_faces, 3, 2)
+
+    atlas_uv_map = np.zeros((resol, resol, 1), dtype=np.float64)
+    face_verts_uvs_atlas_image = (face_verts_uvs * (resol - 1.))\
+        .type(torch.cuda.LongTensor).cpu().numpy()  # (num_faces, 3, 2)
+
+    atlas_uv_map[face_verts_uvs_atlas_image.reshape(-1, 2)[:, 1], face_verts_uvs_atlas_image.reshape(-1, 2)[:, 0], :] = 1.0
+
+
+    x = np.arange(resol)
+    y = np.arange(resol)
+    grid_x, grid_y = np.meshgrid(x, y)
+    map_q_coords = np.concatenate((grid_x[..., None], grid_y[..., None]), axis=-1).reshape(-1, 2)    # (H*W, 2)
+    verts_coords = (face_verts_uvs * (resol - 1.)).cpu().numpy()   # (N_f, 3, 2)
+
+    # use vector cross-product to identify the point-triangle correspondence.
+    AP = map_q_coords[:, None, :] - verts_coords[None, :, 0, :]
+    BP = map_q_coords[:, None, :] - verts_coords[None, :, 1, :]
+    CP = map_q_coords[:, None, :] - verts_coords[None, :, 2, :]
+    CA = verts_coords[None, :, 0, :] - verts_coords[None, :, 2, :]
+    AB = verts_coords[None, :, 1, :] - verts_coords[None, :, 0, :]
+    BC = verts_coords[None, :, 2, :] - verts_coords[None, :, 1, :]
+    cross_A = np.cross(BP, BC)  # the cross-product for identifying vert v0.
+    cross_B = np.cross(CP, CA)  # the cross-product for identifying vert v1.
+    cross_C = np.cross(AP, AB)  # the cross-product for identifying vert v2.
+    flag_A = cross_A < 0.0
+    flag_B = cross_B < 0.0
+    flag_C = cross_C < 0.0
+    flag_total = (flag_A == flag_B) * (flag_A == flag_C)    # (H*W, N_f)
+    # filter outlier pixels that belong to no facets.
+    outlier_mask = (flag_total.sum(axis=-1) == 1.0)
+    flag_total = flag_total[outlier_mask]
+    vis_mask_flag = flag_total.sum(axis=-1)
+
+    if vis_mask_flag.max() == 0.0:
+        raise ValueError('pixels belong to no projected triangle facets !')
+
+    pixel_facet_IDM = flag_total.argmax(axis=-1)
+
+    # use vector cross-product to calculate the barycentric coordinates.
+    area = np.cross(-CA, AB) + 1e-8
+    indices = np.argwhere(flag_total)
+    area_selected = area[0, indices[:, -1]]  # (N_Sf)
+    w0 = cross_A[outlier_mask][flag_total] / area_selected   # (N_Sf)
+    w1 = cross_B[outlier_mask][flag_total] / area_selected
+    w2 = cross_C[outlier_mask][flag_total] / area_selected
+    barycentric = np.concatenate((w0[..., None], w1[..., None], w2[..., None]), axis=-1)
+    checker = barycentric.sum(axis=-1)
+    
+    return outlier_mask, pixel_facet_IDM, barycentric
+
+def generate_init_NM(barycentric, outlier_mask, pixel_facet_IDM,
+						resol=128, mesh=None, atlas_id=None,debug_visualize=True):
+	"""
+		compute the normal map for the input coarse triangulation.
+		Returns:
+			pixel_interpolate_normals: normals for every pixel in 2D-atlas-uv-map.
+				shape: (N_Sf, 3)
+	"""
+	faces_uvs = mesh.textures.faces_uvs_padded()[0]  # (num_view, num_faces, 3) --> (num_faces, 3)
+	verts_uvs = mesh.textures.verts_uvs_padded()[0]  # (num_view, num_verts, 2) --> (num_verts, 2)
+	verts = mesh.verts_padded()[0]
+	faces = mesh.faces_padded()[0]
+	verts_normals = mesh.verts_normals_padded()[0]
+	faces_normals = mesh.faces_normals_padded()[0]
+
+	face_verts_normals = verts_normals[faces]   # (num_faces, 3, 3)
+	pixel_verts_normals = face_verts_normals[pixel_facet_IDM].cpu().numpy() # (N_Sf, 3, 3)
+	pixel_faces_normals = faces_normals[pixel_facet_IDM].cpu().numpy()  # (N_Sf, 3)
+	pixel_interpolate_normals = (pixel_verts_normals * barycentric[..., None]).sum(axis=1)
+
+	# image_faces_normal = np.zeros((resol, resol, 3), dtype=np.float64).reshape(-1, 3)
+	
+	image_verts_normal = np.zeros((resol, resol, 3), dtype=np.float64).reshape(-1, 3)
+
+	image_verts_normal[outlier_mask] = pixel_interpolate_normals
+
+	image_verts_normal = image_verts_normal.reshape(resol,resol,3)
+	
+	# print('Today_debug here:',image_verts_normal.shape)
+	# if debug_visualize:
+	# 	debug_save_folder = os.path.join('debug', 'atlas_normal_map')
+	# 	if not os.path.exists(debug_save_folder):
+	# 		os.makedirs(debug_save_folder)
+
+	# 	image_verts_normal[outlier_mask] = pixel_interpolate_normals
+
+
+	# 	image_verts_normal -= image_verts_normal.min()
+	# 	image_verts_normal /= image_verts_normal.max()
+	# 	plt.imsave(os.path.join(debug_save_folder, 'verts_normal_atlas{}.png'.format(atlas_id)),
+	# 				image_verts_normal.reshape(resol, resol, 3))
+
+	# 	image_faces_normal[outlier_mask] = pixel_faces_normals
+	# 	image_faces_normal -= image_faces_normal.min()
+	# 	image_faces_normal /= image_faces_normal.max()
+	# 	plt.imsave(os.path.join(debug_save_folder, 'faces_normal_atlas{}.png'.format(atlas_id)),
+	# 				image_faces_normal.reshape(resol, resol, 3))
+
+	return image_verts_normal
+
+
+def generate_init_GM(barycentric, outlier_mask, pixel_facet_IDM,
+						resol=128, mesh=None, atlas_id=None, debug_visualize=True):
+	"""
+		compute the geometry image for the input coarse triangulation.
+		Returns:
+			pixel_interpolate_coords: global 3D coords for every pixel in 2D-atlas-uv-map.
+				shape: (N_Sf, 3)
+	"""
+	faces_uvs = mesh.textures.faces_uvs_padded()[0] # (num_view, num_faces, 3) --> (num_faces, 3)
+	verts_uvs = mesh.textures.verts_uvs_padded()[0] # (num_view, num_verts, 2) --> (num_verts, 2)
+	verts = mesh.verts_padded()[0]
+	faces = mesh.faces_padded()[0]
+
+	face_verts_uvs = verts_uvs[faces_uvs]   # (num_faces, 3, 2)
+	face_verts = verts[faces]   # (num_faces, 3, 3)
+
+	pixel_face_verts_uvs = face_verts_uvs[pixel_facet_IDM].cpu().numpy()  # (N_Sf, 3, 2)
+	pixel_face_verts = face_verts[pixel_facet_IDM].cpu().numpy()  # (N_Sf, 3, 3)
+	pixel_interpolate_coords = (pixel_face_verts * barycentric[..., None]).sum(axis=1)  # (N_Sf, 3)
+	pixel_interpolate_uv_coords = (pixel_face_verts_uvs * barycentric[..., None]).sum(axis=1)  # (N_Sf, 3)
+
+	image = np.zeros((resol, resol, 3), dtype=np.float64).reshape(-1, 3)
+	image_uv = np.zeros((resol, resol, 3), dtype=np.float64).reshape(-1, 3)
+	image_interpolate = np.zeros((resol, resol, 3), dtype=np.float64).reshape(-1, 3)
+	image_uv_interpolate = np.zeros((resol, resol, 3), dtype=np.float64).reshape(-1, 3)
+
+	image_interpolate[outlier_mask] = pixel_interpolate_coords
+
+	image_interpolate = image_interpolate.reshape(resol,resol,3)
+
+	# print("today debug here:",image_interpolate.shape)
+
+	# if debug_visualize:
+	# 	debug_save_folder = os.path.join('debug', 'atlas_geo_map')
+	# 	if not os.path.exists(debug_save_folder):
+	# 		os.makedirs(debug_save_folder)
+	# 	image_interpolate[outlier_mask] = pixel_interpolate_coords
+	# 	# TODO:
+	# 	# abandone the large value in z-axis for high contrast visualization.
+	# 	image_interpolate[..., -1] = 0.0
+	# 	# image_interpolate[..., -1] /= image_interpolate[..., -1].mean()
+	# 	image_interpolate -= image_interpolate.min()
+	# 	image_interpolate /= image_interpolate.max()
+	# 	plt.imsave(os.path.join(debug_save_folder, 'face_verts_interpolate_atlas{}.png'.format(atlas_id)),
+	# 				image_interpolate.reshape(resol, resol, 3))
+
+	# 	uv_zeros = np.zeros((pixel_face_verts_uvs.shape[0], 1), dtype=np.float64)
+	# 	image_uv_interpolate[outlier_mask] = np.concatenate((
+	# 		(pixel_face_verts_uvs * barycentric[..., None]).sum(axis=1), uv_zeros), axis=-1)
+	# 	image_uv_interpolate -= image_uv_interpolate.min()
+	# 	image_uv_interpolate /= image_uv_interpolate.max()
+	# 	plt.imsave(os.path.join(debug_save_folder, 'face_uvs_verts_interpolate_atlas{}.png'.format(atlas_id)),
+	# 				image_uv_interpolate.reshape(resol, resol, 3))
+
+	# 	# blend 3 verts coords value for visualization
+	# 	image[outlier_mask] = pixel_face_verts.mean(axis=1)
+	# 	image_uv[outlier_mask] = np.concatenate((pixel_face_verts_uvs.mean(axis=1), uv_zeros), axis=-1)
+
+	# 	# abandone the large value in z-axis for high contrast visualization.
+	# 	image[..., -1] = 0.0
+	# 	# image[..., -1] /= image[..., -1].mean()
+	# 	image = image - image.min()
+	# 	image = image / image.max()
+	# 	plt.imsave(os.path.join(debug_save_folder, 'face_verts_GIM_atlas{}.png'.format(atlas_id)),
+	# 				image.reshape(resol, resol, 3))
+
+	# 	image_uv = image_uv - image_uv.min()
+	# 	image_uv = image_uv / image_uv.max()
+	# 	plt.imsave(os.path.join(debug_save_folder, 'face_uvs_verts_GIM_atlas{}.png'.format(atlas_id)),
+	# 				image_uv.reshape(resol, resol, 3))
+
+	return image_interpolate
+'''
+用于保存3D点云的函数
+'''
+def save2ply(ply_filePath, xyz_np, rgb_np=None, normal_np=None):
+    """
+    save data to ply file, xyz (rgb, normal)
+
+    ---------
+    inputs:
+        xyz_np: (N_voxels, 3)
+        rgb_np: None / (N_voxels, 3)
+        normal_np: None / (N_voxels, 3)
+
+        ply_filePath: 'xxx.ply'
+    outputs:
+        save to .ply file
+    """
+    N_voxels = xyz_np.shape[0]
+    atributes = [('x', '<f4'), ('y', '<f4'), ('z', '<f4')]
+    if normal_np is not None:
+        atributes += [('nx', '<f4'), ('ny', '<f4'), ('nz', '<f4')]
+    if rgb_np is not None:
+        atributes += [('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
+    saved_pts = np.zeros(shape=(N_voxels,), dtype=np.dtype(atributes))
+
+    saved_pts['x'], saved_pts['y'], saved_pts['z'] = xyz_np[:, 0], xyz_np[:, 1], xyz_np[:, 2]
+    if rgb_np is not None:
+        # print('saveed', saved_pts)
+        saved_pts['red'], saved_pts['green'], saved_pts['blue'] = rgb_np[:, 0], rgb_np[:, 1], rgb_np[:, 2]
+    if normal_np is not None:
+        saved_pts['nx'], saved_pts['ny'], saved_pts['nz'] = normal_np[:, 0], normal_np[:, 1], normal_np[:, 2]
+
+    el_vertex = PlyElement.describe(saved_pts, 'vertex')
+    outputFolder = os.path.dirname(ply_filePath)
+    if not os.path.exists(outputFolder):
+        os.makedirs(outputFolder)
+    PlyData([el_vertex]).write(ply_filePath)
+    # print('saved ply file: {}'.format(ply_filePath))
+    return 1
+
+'''
+上色函数,用于可视化
+'''
+def get_color(this_edge_samples):
+    color_num = 0
+    edges_list = []
+    color_i = []
+    for i in range(len(this_edge_samples)):
+        if len(this_edge_samples[i])!=1:
+            edges_list.append(i)
+            color_num += 1
+    for i in range(len(edges_list)):
+        color_i.append([20+(200*i)//color_num,255-20-(200*i)//color_num,i*10%255])
+    return edges_list,color_i
