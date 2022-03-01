@@ -43,3 +43,5 @@ conda activate SurRF
 ##### 2.可视化程序：
 
 运行`python sample_visualize.py`可视化结果，结果保存在`visualize`文件夹中，可以据此验证`generate_samples.py`程序运行是否正确
+
+运行`python sample_visualize_3D.py`可视化3D结果，结果保存在`visualize/3D`文件夹中，可以据此验证`generate_samples.py`程序运行是否正确
