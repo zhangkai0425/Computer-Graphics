@@ -50,7 +50,7 @@ def cal_set_distance(point,point_set):
     输出:给出边界点坐标集和对应的相邻的atlas标号 矩阵 Samples_with_atlas shape(nums_samples,3)
     前两列代表XY坐标,第三列代表对应的相邻的atlas编号
 '''
-def divide_samples(XY,atlas_edges,verts_uvs):
+def divide_samples(XY,atlas_edges,verts_uvs,atlas_resol):
     num_points = XY.shape[0]
     # 这里用循环,第一重循环理论上也许可以去掉,第二和三重没有必要去掉,也似乎不容易去掉
     belong = np.zeros((num_points,1)) # 记录每个点集的归属:属于哪一段边界
@@ -68,9 +68,14 @@ def divide_samples(XY,atlas_edges,verts_uvs):
                 d.append(cal_set_distance(point=point,point_set=point_set))
                 atlas_id.append(j)
         # 根据最近的点和点集的距离判断point属于同哪个atlas相邻的边界    
-        belong_id = d.index(min(d))
-        belong[i] = atlas_id[belong_id]
+        # 设置阈值:将空气的边界与真实边界分离开
+        if min(d) > atlas_resol*0.1:
+            belong[i] = -1
+        else:
+            belong_id = d.index(min(d))
+            belong[i] = atlas_id[belong_id]
         Samples_with_atlas = np.concatenate((XY,belong),axis = 1).astype(int)
+        Samples_with_atlas = Samples_with_atlas[Samples_with_atlas[:,2]>=0]
     return Samples_with_atlas
 
 # TODO:Tested !测试完成,函数无误!
