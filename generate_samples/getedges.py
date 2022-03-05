@@ -107,7 +107,7 @@ def getedges(objFilePath):
                 for verts in verts_list:
                     uv = verts_to_uv[verts_to_uv[:,0]==verts][:,1]
                     uv_list += list(set(uv.tolist()))
-                print("debug here:",len(verts_list),len(uv_list))
+                # print("debug here:",len(verts_list),len(uv_list))
                 each_list += [uv_list]
         edges.append(each_list)
     ### 新加的部分
