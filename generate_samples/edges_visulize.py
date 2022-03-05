@@ -52,8 +52,8 @@ def visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_reso
         verts_atlas, faces_atlas, verts_uvs_atlas, faces_uvs_atlas, z_embedding_length,selected_atlas_indices = selected_atlas_indices
     )    
 
-    edges,verts_to_uv,valid_id = getedges(file_path+'/%s.obj'%mesh_resol)
-    edges = convert_edges(edges=edges,verts_to_uv=verts_to_uv)
+    edges,valid_id = getedges(file_path+'/%s.obj'%mesh_resol)
+    # edges = convert_edges(edges=edges,verts_to_uv=verts_to_uv)
 
     # 生成空白黑图
     picture = np.zeros((atlas_resol,atlas_resol))
@@ -76,4 +76,4 @@ def visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_reso
     plt.imsave(os.path.join(visulize_save_folder, 'edges_points_atlas%s.png'%selected_atlas_indices[0]), picture)
 
 if __name__ == '__main__':
-    visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_resol = 128,selected_atlas_indices = [5])
+    visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_resol = 128,selected_atlas_indices = [0])
