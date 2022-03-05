@@ -166,7 +166,7 @@ def generate_samples(file_path,mesh_resol=3,num_atlas=40,sample_width = 2,atlas_
         XY = get_all_samples(resol = atlas_resol,inner_edge=inner_edge,edge_value=255)
         print("XY的长度:",len(XY))
         
-        Samples_with_atlas = divide_samples(XY=XY,atlas_edges=atlas_edges,verts_uvs=verts_uvs)
+        Samples_with_atlas = divide_samples(XY=XY,atlas_edges=atlas_edges,verts_uvs=verts_uvs,atlas_resol=atlas_resol)
 
         # print(Samples_with_atlas[Samples_with_atlas[:,2]==7][:,0:2]/(atlas_resol-1))
 
