@@ -116,13 +116,28 @@ def getedges(objFilePath):
     return edges,verts_to_uv,valid_id
 
 if __name__ == '__main__':
-    edges,verts_to_uv,valid_id = getedges('/hdd1/zhangkai/256X40/3.obj')
+    mesh_resol = 3
+    edges,verts_to_uv,valid_id = getedges('/hdd1/zhangkai/256X40/%s.obj'%mesh_resol)
     # print(len(edges))
     # print(type(edges))
     # print(len(edges[2]))
-    print(len(edges[1]))
-    print(valid_id)
+    # print(len(edges))
+    # print(valid_id)
     print(edges[0])
+    X = len(edges)
+    Y = len(edges[0])
+    print("X=",X,",Y=",Y)
+    Adjacency = np.zeros((X,Y))
+    for i in range(X):
+        for j in range(Y):
+            if edges[i][j]!=[-1]:
+                Adjacency[i][j] = 1
+            elif i==j:
+                Adjacency[i][j] = 1
+    Adjacency = torch.from_numpy(Adjacency).int()
+    print(Adjacency[0])
+    torch.save(Adjacency,"/hdd1/zhangkai/record/experiment/caches/3_128/adjacency/Adjacency_%s_obj.pt"%mesh_resol)
+    print("save done!")
     # for i in range(len(edges[0])):
     #     if edges[0][i] != [-1]:
     #         print(i)
