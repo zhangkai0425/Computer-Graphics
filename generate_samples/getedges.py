@@ -87,6 +87,9 @@ def getedges(objFilePath):
     edges = [] # atlas_num * atlas_num
     for i in range(atlas_num):
         Tensor_this = face_idx[begin[i]:end[i]]
+        face_part_idx = Tensor_this
+        uv_part_idx = uv_idx[begin[i]:end[i]]
+        verts_to_uv = np.concatenate((face_part_idx.reshape(-1).cpu().numpy()[:,None],uv_part_idx.reshape(-1).cpu().numpy()[:,None]),axis=1)
         each_list = []
         for j in range(atlas_num):
             if i == j:
@@ -96,10 +99,18 @@ def getedges(objFilePath):
                 each_list += [edges[j][i]]
             else:
                 Tensor_that = face_idx[begin[j]:end[j]]
-                each_list += [getIntersection_l(TensorToList(Tensor_this),TensorToList(Tensor_that))]
+                verts_list = getIntersection_l(TensorToList(Tensor_this),TensorToList(Tensor_that))
+                if verts_list == [-1]:
+                    each_list += [[-1]]
+                    continue
+                uv_list = []
+                for verts in verts_list:
+                    uv = verts_to_uv[verts_to_uv[:,0]==verts][:,1]
+                    uv_list += list(set(uv.tolist()))
+                print("debug here:",len(verts_list),len(uv_list))
+                each_list += [uv_list]
         edges.append(each_list)
     ### 新加的部分
-
 
     valid_id = []
     for id in range(atlas_num):
@@ -110,14 +121,13 @@ def getedges(objFilePath):
                 break
         if valid == True:
             valid_id.append(id)
-
-    verts_idx =face_idx
-    verts_to_uv = np.concatenate((verts_idx.reshape(-1).cpu().numpy()[:,None],uv_idx.reshape(-1).cpu().numpy()[:,None]),axis=1)
-    return edges,verts_to_uv,valid_id
+    # verts_idx =face_idx
+    # verts_to_uv = np.concatenate((verts_idx.reshape(-1).cpu().numpy()[:,None],uv_idx.reshape(-1).cpu().numpy()[:,None]),axis=1)
+    return edges,valid_id
 
 if __name__ == '__main__':
     mesh_resol = 3
-    edges,verts_to_uv,valid_id = getedges('/hdd1/zhangkai/256X40/%s.obj'%mesh_resol)
+    edges,valid_id = getedges('/hdd1/zhangkai/256X40/%s.obj'%mesh_resol)
     # print(len(edges))
     # print(type(edges))
     # print(len(edges[2]))
@@ -135,7 +145,7 @@ if __name__ == '__main__':
             elif i==j:
                 Adjacency[i][j] = 1
     Adjacency = torch.from_numpy(Adjacency).int()
-    print(Adjacency[0])
+    # print(Adjacency[0])
     torch.save(Adjacency,"/hdd1/zhangkai/record/experiment/caches/3_128/adjacency/Adjacency_%s_obj.pt"%mesh_resol)
     print("save done!")
     # for i in range(len(edges[0])):
