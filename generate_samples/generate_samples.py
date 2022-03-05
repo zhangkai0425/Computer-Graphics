@@ -149,8 +149,7 @@ def generate_samples(file_path,mesh_resol=3,num_atlas=40,sample_width = 2,atlas_
         verts_atlas, faces_atlas, verts_uvs_atlas, faces_uvs_atlas, z_embedding_length,selected_atlas_indices = selected_atlas_indices
     )    
 
-    edges,verts_to_uv,valid_id = getedges(file_path+'/%s.obj'%mesh_resol)
-    edges = convert_edges(edges=edges,verts_to_uv=verts_to_uv)
+    edges,valid_id = getedges(file_path+'/%s.obj'%mesh_resol)
 
     # print(edges)
     # print(edges[0])
