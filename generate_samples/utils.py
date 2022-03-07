@@ -40,6 +40,32 @@ def cal_set_distance(point,point_set):
 
 # TODO:Tested !测试完成,函数无误!
 
+'''
+    将 2D uv坐标点转化为3D真实坐标的函数
+    point_to_3D(point,mesh):
+    输入:单点/点集 point,mesh对象,分辨率resol
+    输出:3D单点/点集
+'''
+def point_to_3D(point,mesh,resol):
+    outlier_mask, pixel_facet_IDM, barycentric = initialize_atlas_uv_map(resol,mesh)
+    image_interpolate = generate_init_GM(barycentric=barycentric,outlier_mask=outlier_mask,
+            pixel_facet_IDM=pixel_facet_IDM,resol=resol,mesh=mesh,atlas_id=None)
+    XY = (point * (resol-1)).astype(int)
+    point_3D = image_interpolate[XY[:,1],XY[:,0],:]
+    return point_3D
+
+'''
+    计算3D点真实坐标距离的函数
+    cal_set_distance3D(point,point_set,mesh,resol):
+    输入:单点:point shape(1,2);点集point_set shape(set_size,2)[uv坐标],当前mesh对象,分辨率resol
+    输出:最小距离
+'''
+def cal_set_distance3D(point,point_set,mesh,resol):
+    point = point_to_3D(point=point,mesh=mesh,resol=resol)
+    point_set = point_to_3D(point=point_set,mesh=mesh,resol=resol)
+    d = np.sqrt(np.sum((point_set - point)**2,axis=1))
+    return min(d) 
+
 ''' 
     计算某一点(X,Y)最近的atlas
     divide_samples(XY,atlas_edges,verts_uvs)
