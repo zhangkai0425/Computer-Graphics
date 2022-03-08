@@ -46,11 +46,8 @@ def cal_set_distance(point,point_set):
     输入:单点/点集 point,mesh对象,分辨率resol
     输出:3D单点/点集
 '''
-def point_to_3D(point,mesh,resol):
-    outlier_mask, pixel_facet_IDM, barycentric = initialize_atlas_uv_map(resol,mesh)
-    image_interpolate = generate_init_GM(barycentric=barycentric,outlier_mask=outlier_mask,
-            pixel_facet_IDM=pixel_facet_IDM,resol=resol,mesh=mesh,atlas_id=None)
-    XY = (point * (resol-1)).astype(int)
+def point_to_3D(point,image_interpolate):
+    XY = point.reshape(-1,2)
     point_3D = image_interpolate[XY[:,1],XY[:,0],:]
     return point_3D
 
@@ -60,9 +57,10 @@ def point_to_3D(point,mesh,resol):
     输入:单点:point shape(1,2);点集point_set shape(set_size,2)[uv坐标],当前mesh对象,分辨率resol
     输出:最小距离
 '''
-def cal_set_distance3D(point,point_set,mesh,resol):
-    point = point_to_3D(point=point,mesh=mesh,resol=resol)
-    point_set = point_to_3D(point=point_set,mesh=mesh,resol=resol)
+def cal_set_distance3D(point,point_set,mesh,resol,image_interpolate):
+
+    point = point_to_3D(point=point,image_interpolate=image_interpolate)
+    point_set = point_to_3D(point=point_set,image_interpolate=image_interpolate)
     d = np.sqrt(np.sum((point_set - point)**2,axis=1))
     return min(d) 
 
@@ -76,10 +74,13 @@ def cal_set_distance3D(point,point_set,mesh,resol):
     输出:给出边界点坐标集和对应的相邻的atlas标号 矩阵 Samples_with_atlas shape(nums_samples,3)
     前两列代表XY坐标,第三列代表对应的相邻的atlas编号
 '''
-def divide_samples(XY,atlas_edges,verts_uvs,atlas_resol):
+def divide_samples(XY,atlas_edges,verts_uvs,atlas_resol,mesh):
     num_points = XY.shape[0]
     # 这里用循环,第一重循环理论上也许可以去掉,第二和三重没有必要去掉,也似乎不容易去掉
     belong = np.zeros((num_points,1)) # 记录每个点集的归属:属于哪一段边界
+    outlier_mask, pixel_facet_IDM, barycentric = initialize_atlas_uv_map(atlas_resol,mesh)
+    image_interpolate = generate_init_GM(barycentric=barycentric,outlier_mask=outlier_mask,
+            pixel_facet_IDM=pixel_facet_IDM,resol=atlas_resol,mesh=mesh,atlas_id=None)
     for i in range(num_points):
         point = XY[i,:]
         d = []
@@ -91,17 +92,21 @@ def divide_samples(XY,atlas_edges,verts_uvs,atlas_resol):
             else:
                 atlas_edges_1 = [(i-1) for i in atlas_edges[j]]
                 point_set = verts_uvs[atlas_edges_1,:]
-                d.append(cal_set_distance(point=point,point_set=point_set))
+                # 2D 距离
+                # d.append(cal_set_distance(point=point,point_set=point_set))
+                # 3D 距离
+                d.append(cal_set_distance3D(point=point,point_set=point_set,mesh=mesh,resol=atlas_resol,image_interpolate=image_interpolate))
                 atlas_id.append(j)
         # 根据最近的点和点集的距离判断point属于同哪个atlas相邻的边界    
         # 设置阈值:将空气的边界与真实边界分离开
-        if min(d) > atlas_resol*0.1:
+        if min(d) > atlas_resol*10000:
             belong[i] = -1
         else:
             belong_id = d.index(min(d))
             belong[i] = atlas_id[belong_id]
         Samples_with_atlas = np.concatenate((XY,belong),axis = 1).astype(int)
-        Samples_with_atlas = Samples_with_atlas[Samples_with_atlas[:,2]>=0]
+        # print("进度:","%s/%s"%(i,num_points))
+    Samples_with_atlas = Samples_with_atlas[Samples_with_atlas[:,2]>=0]
     return Samples_with_atlas
 
 # TODO:Tested !测试完成,函数无误!
