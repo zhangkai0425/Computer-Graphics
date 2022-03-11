@@ -95,8 +95,8 @@ def getedges(objFilePath):
             if i == j:
                 each_list += [[-1]]
                 continue
-            if j < i:
-                each_list += [edges[j][i]]
+            # if j < i:
+            #     each_list += [edges[j][i]]
             else:
                 Tensor_that = face_idx[begin[j]:end[j]]
                 verts_list = getIntersection_l(TensorToList(Tensor_this),TensorToList(Tensor_that))
