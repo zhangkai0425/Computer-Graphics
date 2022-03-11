@@ -54,7 +54,6 @@ def visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_reso
 
     edges,valid_id = getedges(file_path+'/%s.obj'%mesh_resol)
     # edges = convert_edges(edges=edges,verts_to_uv=verts_to_uv)
-
     # 生成空白黑图
     picture = np.zeros((atlas_resol,atlas_resol))
 
@@ -69,11 +68,12 @@ def visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_reso
         # picture[point_set[:,1],point_set[:,0]] = 255
         i += 1
     visulize_save_folder = 'visulize/edges'
-    picture[30,30] = 255
     # widthImg = cv.GaussianBlur(gaussImg,(3,3),0)
     if not os.path.exists(visulize_save_folder):
         os.makedirs(visulize_save_folder)
     plt.imsave(os.path.join(visulize_save_folder, 'edges_points_atlas%s.png'%selected_atlas_indices[0]), picture)
 
 if __name__ == '__main__':
-    visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_resol = 128,selected_atlas_indices = [0])
+    # visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_resol = 128,selected_atlas_indices = [4])
+    for i in range(30):
+        visulize_edges(file_path = '/hdd1/zhangkai/256X40',mesh_resol = 3,atlas_resol = 128,selected_atlas_indices = [i])
