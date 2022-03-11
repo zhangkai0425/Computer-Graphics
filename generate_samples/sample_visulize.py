@@ -16,7 +16,7 @@ from pytorch3d.structures import Meshes, Pointclouds, join_meshes_as_scene, join
 from pytorch3d.renderer.mesh.rasterizer import Fragments
 from pytorch3d.renderer.mesh.textures import TexturesUV
 
-def visulize(sample_width = 2,selected_atlas_indices=[5],mesh_resol = 3):
+def visulize(sample_width = 2,selected_atlas_indices=[0],mesh_resol = 3):
     edges_samples,valid_id = generate_samples(file_path = '/hdd1/zhangkai/256X40',mesh_resol=3,num_atlas=40,sample_width = sample_width,atlas_resol = 128)
 
     # 可视化程序,只可视化atlas[5]了,可以调节
@@ -62,7 +62,7 @@ def visulize(sample_width = 2,selected_atlas_indices=[5],mesh_resol = 3):
         print(face_verts_uvs_atlas_image.min(), face_verts_uvs_atlas_image.max())
 
         atlas_uv_map[face_verts_uvs_atlas_image.reshape(-1, 2)[:, 1], face_verts_uvs_atlas_image.reshape(-1, 2)[:, 0], :] = 1.0
-        visulize_save_folder = 'visulize'
+        visulize_save_folder = 'visulize/samples'
         # TODO:1.图1
         if not os.path.exists(visulize_save_folder):
             os.makedirs(visulize_save_folder)
@@ -107,7 +107,7 @@ def visulize(sample_width = 2,selected_atlas_indices=[5],mesh_resol = 3):
 
         # TODO: 提取uv_map中atlas的边界
 
-        img = cv.imread('visulize/map_mask%s.png'%atlas_id)
+        img = cv.imread('visulize/samples/map_mask%s.png'%atlas_id)
         # 转化为灰度图-二值图
         gray_img = cv.cvtColor(img, cv.COLOR_BGR2GRAY)
         gray_img[gray_img>100] = 255
@@ -134,15 +134,15 @@ def visulize(sample_width = 2,selected_atlas_indices=[5],mesh_resol = 3):
         # print((np.sum(gray_edge==255)+np.sum(gray_edge==0))/128)
         # 阈值二值化
 
-        plt.imsave(os.path.join(visulize_save_folder, 'edge.png'.format(atlas_id)), gray_edge)
+        plt.imsave(os.path.join(visulize_save_folder, 'edge_{}.png'.format(atlas_id)), gray_edge)
 
         # 内部取点,取交集
         inner_edge = np.zeros(gray_edge.shape)
         inner_edge[(gray_edge==255)*(gray_img==255)] = 255
 
-        plt.imsave(os.path.join(visulize_save_folder, 'inner.png'.format(atlas_id)), inner_edge)
+        plt.imsave(os.path.join(visulize_save_folder, 'inner_{}.png'.format(atlas_id)), inner_edge)
 
-        this_edge_samples = edges_samples[selected_atlas_indices[0]]
+        this_edge_samples = edges_samples[selected_atlas_indices[atlas_i]]
         # print(this_edge_samples)
         color_num = 0
         edges_list = []
@@ -151,17 +151,20 @@ def visulize(sample_width = 2,selected_atlas_indices=[5],mesh_resol = 3):
             if len(this_edge_samples[i])!=1:
                 edges_list.append(i)
                 color_num += 1
+        print("debug here!",edges_list)
         # print(color_num,edges_list)
 
         sample_edge = np.zeros(inner_edge.shape)
         for i in range(len(edges_list)):
             color_i = 20+(200*i)//color_num
+            print("color:",color_i)
             XY = (this_edge_samples[edges_list[i]]*(128-1)).astype(int)
             # print(XY)
             sample_edge[XY[:,1],XY[:,0]] = color_i
 
-        print(inner_edge.shape)
-        plt.imsave(os.path.join(visulize_save_folder, 'edge_samples.png'.format(atlas_id)),sample_edge)
+        plt.imsave(os.path.join(visulize_save_folder, 'edge_samples_{}.png'.format(atlas_id)),sample_edge)
 
 if __name__ == '__main__':
-    visulize(sample_width = 3,selected_atlas_indices = [0],mesh_resol = 3)
+    selected_atlas_indices = [i for i in range(40)]
+    visulize(sample_width = 3,selected_atlas_indices = selected_atlas_indices,mesh_resol = 3)
+    
