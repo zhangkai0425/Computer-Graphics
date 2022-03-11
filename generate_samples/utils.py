@@ -93,13 +93,13 @@ def divide_samples(XY,atlas_edges,verts_uvs,atlas_resol,mesh):
                 atlas_edges_1 = [(i-1) for i in atlas_edges[j]]
                 point_set = verts_uvs[atlas_edges_1,:]
                 # 2D 距离
-                # d.append(cal_set_distance(point=point,point_set=point_set))
+                d.append(cal_set_distance(point=point,point_set=point_set))
                 # 3D 距离
-                d.append(cal_set_distance3D(point=point,point_set=point_set,mesh=mesh,resol=atlas_resol,image_interpolate=image_interpolate))
+                # d.append(cal_set_distance3D(point=point,point_set=point_set,mesh=mesh,resol=atlas_resol,image_interpolate=image_interpolate))
                 atlas_id.append(j)
         # 根据最近的点和点集的距离判断point属于同哪个atlas相邻的边界    
         # 设置阈值:将空气的边界与真实边界分离开
-        if min(d) > atlas_resol*10000:
+        if min(d) > 0.1*atlas_resol:
             belong[i] = -1
         else:
             belong_id = d.index(min(d))
