@@ -180,8 +180,10 @@ def generate_samples(file_path,mesh_resol=3,num_atlas=40,sample_width = 2,atlas_
     return edges_samples,valid_id
 
 if __name__ == '__main__':
-    edges_samples,valid_id = generate_samples(file_path = '/hdd1/zhangkai/256X40',mesh_resol=3,num_atlas=40,sample_width = 2,atlas_resol = 128)
+    atlas_resol = 1024
+    edges_samples,valid_id = generate_samples(file_path = '/hdd1/zhangkai/256X40',mesh_resol=3,num_atlas=40,sample_width = 4,atlas_resol = atlas_resol)
     print(valid_id)
     # print(edges_samples[38])
-    print(edges_samples[38][0])
-    
+    # print(edges_samples[38][0])
+    torch.save(edges_samples,"samples_%s.pt"%(atlas_resol))
+    print("done!")
