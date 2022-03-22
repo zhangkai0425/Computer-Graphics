@@ -47,32 +47,54 @@ def generate_3D_edges(file_path='/hdd1/zhangkai/256X40',mesh_resol=3,atlas_resol
     )
     Inner_Edge_3D = []
     Out_Edge_3D = []
+    Inner_Edge_NM = []
+    Out_Edge_NM = []
     for i in range(len(Edge_Id)):
+
         # 内边界
         atlas_mesh = atlas_mesh_list[Edge_Id[i][0]]
         outlier_mask, pixel_facet_IDM, barycentric = initialize_atlas_uv_map(resol=atlas_resol,mesh=atlas_mesh)
         image_interpolate = generate_init_GM(barycentric=barycentric,outlier_mask=outlier_mask,
             pixel_facet_IDM=pixel_facet_IDM,resol=atlas_resol,mesh=atlas_mesh,atlas_id=Edge_Id[i][0])
+        image_verts_normal = generate_init_NM(barycentric=barycentric,outlier_mask=outlier_mask,
+            pixel_facet_IDM=pixel_facet_IDM,resol=atlas_resol,mesh = atlas_mesh,atlas_id=Edge_Id[i][0])
         XY = (ALL_Edge[0][i] * (atlas_resol-1)).astype(int)
         Inner_Edge_3D += [image_interpolate[XY[:,1],XY[:,0],:]]
+        Inner_Edge_NM += [image_verts_normal[XY[:,1],XY[:,0],:]]
 
         # 外边界
         atlas_mesh = atlas_mesh_list[Edge_Id[i][1]]
         outlier_mask, pixel_facet_IDM, barycentric = initialize_atlas_uv_map(resol=atlas_resol,mesh=atlas_mesh)
         image_interpolate = generate_init_GM(barycentric=barycentric,outlier_mask=outlier_mask,
-            pixel_facet_IDM=pixel_facet_IDM,resol=atlas_resol,mesh=atlas_mesh,atlas_id=Edge_Id[i][0])
+            pixel_facet_IDM=pixel_facet_IDM,resol=atlas_resol,mesh=atlas_mesh,atlas_id=Edge_Id[i][1])
+        image_verts_normal = generate_init_NM(barycentric=barycentric,outlier_mask=outlier_mask,
+            pixel_facet_IDM=pixel_facet_IDM,resol=atlas_resol,mesh = atlas_mesh,atlas_id=Edge_Id[i][1])
+
         XY = (ALL_Edge[1][i] * (atlas_resol-1)).astype(int)
         Out_Edge_3D += [image_interpolate[XY[:,1],XY[:,0],:]]
+        Out_Edge_NM += [image_verts_normal[XY[:,1],XY[:,0],:]]
         print("atlas_id:",Edge_Id[i],"done!","当前进度:%s/%s"%(i,len(Edge_Id)))
+
     ALL_Edge_3D = []
     ALL_Edge_3D.append(Inner_Edge_3D)
     ALL_Edge_3D.append(Out_Edge_3D)
-    return ALL_Edge_3D
+    ALL_Edge_NM = []
+    ALL_Edge_NM.append(Inner_Edge_NM)
+    ALL_Edge_NM.append(Out_Edge_NM)
+
+    return ALL_Edge_3D,ALL_Edge_NM
 
 if __name__ == '__main__':
     Edge_Id = torch.load("Edge_Id_1024.pt")
     ALL_Edge = torch.load("ALL_Edge_1024.pt")
-    ALL_Edge_3D = generate_3D_edges(file_path='/hdd1/zhangkai/256X40',mesh_resol=3,atlas_resol=1024,num_atlas = 40,Edge_Id = Edge_Id,ALL_Edge = ALL_Edge)
+    ALL_Edge_3D,ALL_Edge_NM = generate_3D_edges(file_path='/hdd1/zhangkai/256X40',mesh_resol=3,atlas_resol=1024,num_atlas = 40,Edge_Id = Edge_Id,ALL_Edge = ALL_Edge)
+    for i in range(2):
+        for j in range(len(Edge_Id)):
+            ALL_Edge_3D[i][j] = torch.from_numpy(ALL_Edge_3D[i][j])
+            ALL_Edge_NM[i][j] = torch.from_numpy(ALL_Edge_NM[i][j])
+            
+    torch.save(ALL_Edge_3D,"ALL_Edge_3D_1024_torch.pt")
+    torch.save(ALL_Edge_NM,"ALL_Edge_NM_1024_torch.pt")
 
     XYZ = np.array([[0,0,0]])
     RGB = np.array([[0,0,0]])
