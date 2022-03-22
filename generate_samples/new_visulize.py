@@ -96,6 +96,7 @@ if __name__ == '__main__':
     torch.save(ALL_Edge_3D,"ALL_Edge_3D_1024_torch.pt")
     torch.save(ALL_Edge_NM,"ALL_Edge_NM_1024_torch.pt")
 
+    ### 上色保存点云
     XYZ = np.array([[0,0,0]])
     RGB = np.array([[0,0,0]])
 
@@ -122,3 +123,39 @@ if __name__ == '__main__':
     print(XYZ.shape,RGB.shape)
 
     save2ply(ply_filePath="visulize/3D/edges_1024.ply",xyz_np=XYZ,rgb_np=RGB)
+
+
+    # pad:
+    maxsize = 1
+    for i in range(2):
+        for j in range(len(Edge_Id)):
+            if len(ALL_Edge_3D[i][j]) > maxsize:
+                maxsize = len(ALL_Edge_3D[i][j])
+    
+    for i in range(len(Edge_Id)):
+        Inner_Edge_i = ALL_Edge_3D[0][i]
+        pad_size = maxsize - Inner_Edge_i.shape[0]
+        pad = nn.ZeroPad2d(padding=(0,0,0,pad_size))
+        ALL_Edge_3D[0][i] = pad(Inner_Edge_i)
+    
+        Outer_Edge_i = ALL_Edge_3D[1][i]
+        pad_size = maxsize - Outer_Edge_i.shape[0]
+        pad = nn.ZeroPad2d(padding=(0,0,0,pad_size))
+        ALL_Edge_3D[1][i] = pad(Outer_Edge_i)
+
+    for i in range(len(Edge_Id)):
+        Inner_Edge_i = ALL_Edge_NM[0][i]
+        pad_size = maxsize - Inner_Edge_i.shape[0]
+        pad = nn.ZeroPad2d(padding=(0,0,0,pad_size))
+        ALL_Edge_NM[0][i] = pad(Inner_Edge_i)
+    
+        Outer_Edge_i = ALL_Edge_NM[1][i]
+        pad_size = maxsize - Outer_Edge_i.shape[0]
+        pad = nn.ZeroPad2d(padding=(0,0,0,pad_size))
+        ALL_Edge_NM[1][i] = pad(Outer_Edge_i)
+
+    torch.save(ALL_Edge_3D,"ALL_Edge_3D_1024_torch_padded.pt")
+    torch.save(ALL_Edge_NM,"ALL_Edge_NM_1024_torch_padded.pt")
+
+    print("All done!")
+
